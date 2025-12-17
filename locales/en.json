@@ -1,0 +1,77 @@
+{
+    "app": {
+        "title": "VoiceHub - Voice Chat",
+        "description": "Quick and easy voice chat rooms. Start voice calls instantly without registration."
+    },
+    "lobby": {
+        "brandTitle": "VoiceHub",
+        "tagline": "No signup. No ads. Just voice.",
+        "username": "Username",
+        "usernamePlaceholder": "Enter your name...",
+        "createRoom": "Create Room",
+        "joinRoom": "Join Room",
+        "roomCode": "Room Code",
+        "roomCodePlaceholder": "6-digit code...",
+        "join": "Join"
+    },
+    "room": {
+        "voiceRoom": "Voice Room",
+        "participants": "Participants",
+        "chat": "Chat",
+        "messagePlaceholder": "Type a message...",
+        "copyCode": "Copy Code",
+        "shareLink": "Share Link",
+        "setPassword": "Set Password",
+        "leaveRoom": "Leave Room",
+        "screenShare": "Share Screen",
+        "mute": "Mute",
+        "unmute": "Unmute",
+        "sendFile": "Send File",
+        "send": "Send",
+        "dropFileHere": "📎 Drop file here"
+    },
+    "status": {
+        "connecting": "Connecting...",
+        "connected": "Connected",
+        "disconnected": "Disconnected",
+        "screenSharing": "Screen Sharing"
+    },
+    "modals": {
+        "roomPassword": "Room Password",
+        "passwordRequired": "Password Required",
+        "passwordHint": "Password (leave empty to remove)",
+        "passwordPlaceholder": "Enter password...",
+        "savePassword": "Save Password",
+        "passwordProtected": "This room is password protected. Please enter the password.",
+        "enterPassword": "Password",
+        "joinWithPassword": "Join",
+        "volumeControl": "Volume Control",
+        "joinRoomTitle": "Join Room",
+        "enterUsername": "Enter your username to join the room."
+    },
+    "toast": {
+        "codeCopied": "Code copied!",
+        "linkCopied": "Link copied!",
+        "joinedRoom": "Joined the room!",
+        "userJoined": "{name} joined the room",
+        "userLeft": "{name} left the room",
+        "kicked": "You were kicked from the room!",
+        "userKicked": "{name} was kicked",
+        "roomClosed": "Room closed",
+        "wrongPassword": "Wrong password!",
+        "passwordRequired": "Password required",
+        "passwordSet": "Password set",
+        "passwordRemoved": "Password removed",
+        "connectingToHost": "Connecting to host...",
+        "connectionError": "Connection error",
+        "enterValidCode": "Enter a valid room code",
+        "enterPassword": "Please enter password",
+        "onlyHostCanSetPassword": "Only the host can set password"
+    },
+    "file": {
+        "sending": "Sending...",
+        "downloading": "Downloading...",
+        "sent": "✅ Sent",
+        "download": "📥 Download"
+    }
+}

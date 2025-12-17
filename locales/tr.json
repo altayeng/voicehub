@@ -1,0 +1,77 @@
+{
+    "app": {
+        "title": "VoiceHub - Sesli Sohbet",
+        "description": "Hızlı ve kolay sesli sohbet odaları. Kayıt olmadan anında sesli görüşme başlatın."
+    },
+    "lobby": {
+        "brandTitle": "VoiceHub",
+        "tagline": "Kayıt yok. Reklam yok. Sadece ses.",
+        "username": "Kullanıcı Adı",
+        "usernamePlaceholder": "Adınızı girin...",
+        "createRoom": "Oda Oluştur",
+        "joinRoom": "Odaya Katıl",
+        "roomCode": "Oda Kodu",
+        "roomCodePlaceholder": "6 haneli kod...",
+        "join": "Katıl"
+    },
+    "room": {
+        "voiceRoom": "Sesli Oda",
+        "participants": "Katılımcılar",
+        "chat": "Sohbet",
+        "messagePlaceholder": "Mesaj yaz...",
+        "copyCode": "Kodu Kopyala",
+        "shareLink": "Linki Paylaş",
+        "setPassword": "Şifre Ayarla",
+        "leaveRoom": "Odadan Ayrıl",
+        "screenShare": "Ekran Paylaş",
+        "mute": "Mikrofonu Kapat",
+        "unmute": "Mikrofonu Aç",
+        "sendFile": "Dosya Gönder",
+        "send": "Gönder",
+        "dropFileHere": "📎 Dosyayı buraya bırak"
+    },
+    "status": {
+        "connecting": "Bağlanıyor...",
+        "connected": "Bağlandı",
+        "disconnected": "Bağlantı kesildi",
+        "screenSharing": "Ekran Paylaşımı"
+    },
+    "modals": {
+        "roomPassword": "Oda Şifresi",
+        "passwordRequired": "Şifre Gerekli",
+        "passwordHint": "Şifre (boş bırakırsan şifre kaldırılır)",
+        "passwordPlaceholder": "Şifre girin...",
+        "savePassword": "Şifreyi Kaydet",
+        "passwordProtected": "Bu oda şifre korumalı. Lütfen şifreyi girin.",
+        "enterPassword": "Şifre",
+        "joinWithPassword": "Katıl",
+        "volumeControl": "Ses Seviyesi",
+        "joinRoomTitle": "Odaya Katıl",
+        "enterUsername": "Odaya katılmak için kullanıcı adınızı girin."
+    },
+    "toast": {
+        "codeCopied": "Kod kopyalandı!",
+        "linkCopied": "Link kopyalandı!",
+        "joinedRoom": "Odaya katıldın!",
+        "userJoined": "{name} odaya katıldı",
+        "userLeft": "{name} odadan ayrıldı",
+        "kicked": "Odadan atıldınız!",
+        "userKicked": "{name} odadan atıldı",
+        "roomClosed": "Oda kapatıldı",
+        "wrongPassword": "Yanlış şifre!",
+        "passwordRequired": "Şifre gerekli",
+        "passwordSet": "Şifre ayarlandı",
+        "passwordRemoved": "Şifre kaldırıldı",
+        "connectingToHost": "Host'a bağlanılıyor...",
+        "connectionError": "Bağlantı hatası oluştu",
+        "enterValidCode": "Geçerli bir oda kodu girin",
+        "enterPassword": "Lütfen şifre girin",
+        "onlyHostCanSetPassword": "Sadece oda sahibi şifre ayarlayabilir"
+    },
+    "file": {
+        "sending": "Gönderiliyor...",
+        "downloading": "İndiriliyor...",
+        "sent": "✅ Gönderildi",
+        "download": "📥 İndir"
+    }
+}
