@@ -30,5 +30,6 @@ Built with vanilla JavaScript and **PeerJS** for the WebRTC magic. It's lightwei
 1.  Clone it.
 2.  Open `index.html` via a local server (like Live Server).
 3.  **Important:** For microphone access to work over the internet, you must serve this over **HTTPS** (Vercel, Netlify, Github Pages work great).
-
+You can test it on my live server: **https://altaykrl.com/ses/**
 Enjoy the comms! 🎮
+
