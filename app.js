@@ -1493,9 +1493,12 @@ class VoiceHub {
             return;
         }
 
+        // Save the room code before hiding the modal (hideEnterPasswordModal sets pendingJoinCode to null)
+        const roomCode = this.pendingJoinCode;
+
         // Continue join with password
         this.hideEnterPasswordModal();
-        this.joinRoomWithPassword(this.pendingJoinCode, password);
+        this.joinRoomWithPassword(roomCode, password);
     }
 
     async joinRoomWithPassword(code, password) {
