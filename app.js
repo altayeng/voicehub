@@ -21,6 +21,24 @@ class VoiceHub {
         this.reconnectAttempts = 0;
         this.maxReconnectAttempts = 3;
 
+        // Audio processing for noise gate
+        this.audioContext = null;
+        this.analyser = null;
+        this.noiseGateEnabled = false;
+        this.noiseThreshold = 15;
+        this.gainNode = null;
+        this.micLevelInterval = null;
+
+        // Audio settings
+        this.audioSettings = {
+            noiseSuppression: true,
+            echoCancellation: true,
+            autoGainControl: true,
+            noiseGate: false,
+            noiseThreshold: 15
+        };
+        this.loadAudioSettings();
+
         // ICE Servers configuration for cross-network communication
         // Using free public TURN servers
         this.iceServers = {
@@ -163,6 +181,9 @@ class VoiceHub {
         this.screenShareVideo = document.getElementById('screen-share-video');
         this.screenShareUser = document.getElementById('screen-share-user');
         this.closeScreenShare = document.getElementById('close-screen-share');
+        this.fullscreenBtn = document.getElementById('fullscreen-btn');
+        this.fullscreenEnterIcon = document.getElementById('fullscreen-enter-icon');
+        this.fullscreenExitIcon = document.getElementById('fullscreen-exit-icon');
 
         // Password & Link Share elements
         this.shareLinkBtn = document.getElementById('share-link-btn');
@@ -197,6 +218,20 @@ class VoiceHub {
 
         // File transfer tracking
         this.pendingFiles = new Map();
+
+        // Settings Modal elements
+        this.settingsBtn = document.getElementById('settings-btn');
+        this.settingsModal = document.getElementById('settings-modal');
+        this.closeSettingsModal = document.getElementById('close-settings-modal');
+        this.noiseSuppressionToggle = document.getElementById('noise-suppression-toggle');
+        this.noiseGateToggle = document.getElementById('noise-gate-toggle');
+        this.noiseGateSettings = document.getElementById('noise-gate-settings');
+        this.noiseThresholdSlider = document.getElementById('noise-threshold');
+        this.noiseThresholdValue = document.getElementById('noise-threshold-value');
+        this.noiseThresholdLine = document.getElementById('noise-threshold-line');
+        this.micLevelIndicator = document.getElementById('mic-level-indicator');
+        this.echoCancellationToggle = document.getElementById('echo-cancellation-toggle');
+        this.autoGainToggle = document.getElementById('auto-gain-toggle');
     }
 
     bindEvents() {
@@ -217,7 +252,13 @@ class VoiceHub {
         this.leaveRoomBtn.addEventListener('click', () => this.leaveRoom());
         this.screenShareBtn.addEventListener('click', () => this.toggleScreenShare());
         this.closeScreenShare.addEventListener('click', () => this.stopScreenShare());
+        this.fullscreenBtn.addEventListener('click', () => this.toggleFullscreen());
+        this.screenShareVideo.addEventListener('dblclick', () => this.toggleFullscreen());
         this.muteBtn.addEventListener('click', () => this.toggleMute());
+
+        // Fullscreen change event
+        document.addEventListener('fullscreenchange', () => this.handleFullscreenChange());
+        document.addEventListener('webkitfullscreenchange', () => this.handleFullscreenChange());
 
         // Modal events
         this.closeVolumeModal.addEventListener('click', () => this.hideVolumeModal());
@@ -284,6 +325,53 @@ class VoiceHub {
 
         // Handle page unload
         window.addEventListener('beforeunload', () => this.leaveRoom());
+
+        // Settings modal events
+        this.settingsBtn.addEventListener('click', () => this.showSettingsModal());
+        this.closeSettingsModal.addEventListener('click', () => this.hideSettingsModal());
+        this.settingsModal.addEventListener('click', (e) => {
+            if (e.target === this.settingsModal) this.hideSettingsModal();
+        });
+
+        // Audio settings events
+        this.noiseSuppressionToggle.addEventListener('change', (e) => {
+            this.audioSettings.noiseSuppression = e.target.checked;
+            this.saveAudioSettings();
+            this.applyAudioSettings();
+        });
+
+        this.noiseGateToggle.addEventListener('change', (e) => {
+            this.audioSettings.noiseGate = e.target.checked;
+            this.noiseGateEnabled = e.target.checked;
+            this.noiseGateSettings.classList.toggle('hidden', !e.target.checked);
+            this.saveAudioSettings();
+            if (e.target.checked) {
+                this.startMicLevelMonitor();
+            } else {
+                this.stopMicLevelMonitor();
+            }
+        });
+
+        this.noiseThresholdSlider.addEventListener('input', (e) => {
+            const value = parseInt(e.target.value);
+            this.noiseThreshold = value;
+            this.audioSettings.noiseThreshold = value;
+            this.noiseThresholdValue.textContent = value;
+            this.noiseThresholdLine.style.left = value + '%';
+            this.saveAudioSettings();
+        });
+
+        this.echoCancellationToggle.addEventListener('change', (e) => {
+            this.audioSettings.echoCancellation = e.target.checked;
+            this.saveAudioSettings();
+            this.applyAudioSettings();
+        });
+
+        this.autoGainToggle.addEventListener('change', (e) => {
+            this.audioSettings.autoGainControl = e.target.checked;
+            this.saveAudioSettings();
+            this.applyAudioSettings();
+        });
     }
 
     loadUsername() {
@@ -297,17 +385,58 @@ class VoiceHub {
         localStorage.setItem('voicehub_username', this.usernameInput.value);
     }
 
+    // Predefined special rooms
+    getPredefinedRooms() {
+        return {
+            'cs2': { code: 'CS2ODA', password: '4848' },
+            'valorant': { code: 'VALODA', password: '4848' },
+            'lol': { code: 'LOLODA', password: '4848' }
+        };
+    }
+
     checkUrlParams() {
         const urlParams = new URLSearchParams(window.location.search);
-        const roomCode = urlParams.get('room');
+        let roomCode = urlParams.get('room');
         const urlPassword = urlParams.get('pwd');
+        
+        if (!roomCode) return;
+        
+        // Check for predefined room names (e.g., ?room=cs2)
+        const predefinedRooms = this.getPredefinedRooms();
+        const roomLower = roomCode.toLowerCase();
+        
+        if (predefinedRooms[roomLower]) {
+            const roomConfig = predefinedRooms[roomLower];
+            this.pendingJoinCode = roomConfig.code;
+            this.predefinedRoomName = roomLower;
+            this.predefinedRoomConfig = roomConfig;
+            
+            if (roomConfig.password) {
+                this.enteredPassword = roomConfig.password;
+            }
+            
+            // Check if username already exists
+            const savedUsername = localStorage.getItem('voicehub_username');
+            if (savedUsername && savedUsername.trim()) {
+                this.usernameInput.value = savedUsername;
+                this.roomCodeInput.value = this.pendingJoinCode;
+                this.showToast('Özel odaya bağlanılıyor...');
+                setTimeout(() => this.joinPredefinedRoom(), 500);
+            } else {
+                this.showUsernamePrompt();
+            }
+            return;
+        }
+        
+        // Regular 6-character room code
 
-        if (roomCode && roomCode.length === 6) {
+        if (roomCode.length === 6) {
             this.pendingJoinCode = roomCode.toUpperCase();
 
             // Store password from URL if present
             if (urlPassword) {
                 this.urlPassword = decodeURIComponent(urlPassword);
+                this.enteredPassword = this.urlPassword;
             }
 
             // Check if username already exists
@@ -322,9 +451,121 @@ class VoiceHub {
                 // Show username prompt before joining
                 this.showUsernamePrompt();
             }
+        }
+    }
 
-            // Clear URL params after reading
-            window.history.replaceState({}, document.title, window.location.pathname);
+    async joinPredefinedRoom() {
+        // Try to join the predefined room, if host not available, become host
+        this.username = this.usernameInput.value.trim() || 'Anonim';
+        this.roomCode = this.pendingJoinCode;
+        
+        try {
+            await this.getMediaStream();
+            await this.initPeer(this.roomCode, false);
+            
+            const hostId = `voicehub-${this.roomCode}-host`;
+            
+            // Try to connect to existing host
+            this.showToast('Odaya bağlanılıyor...');
+            
+            // Set a timeout to become host if no response
+            const hostCheckTimeout = setTimeout(async () => {
+                if (this.pendingConnection) {
+                    console.log('Host bulunamadı, host olunuyor...');
+                    this.pendingConnection = null;
+                    
+                    // Destroy current peer and recreate as host
+                    if (this.peer) {
+                        this.peer.destroy();
+                    }
+                    
+                    this.isHost = true;
+                    await this.initPeer(this.roomCode, true);
+                    
+                    // Set the predefined password if exists
+                    if (this.predefinedRoomConfig?.password) {
+                        this.roomPassword = this.predefinedRoomConfig.password;
+                        this.updatePasswordUI();
+                    }
+                    
+                    this.participants.set(this.myPeerId, {
+                        id: this.myPeerId,
+                        name: this.username,
+                        isHost: true,
+                        isMuted: false
+                    });
+                    
+                    this.showRoomScreen();
+                    this.renderParticipants();
+                    this.updatePredefinedRoomUrl();
+                    this.showToast('Oda oluşturuldu - Host sizsiniz!');
+                }
+            }, 3000);
+            
+            const conn = this.peer.connect(hostId, {
+                metadata: {
+                    username: this.username,
+                    type: 'join',
+                    password: this.enteredPassword || null
+                },
+                reliable: true
+            });
+            
+            this.pendingConnection = { conn, hostId, timeout: hostCheckTimeout };
+            
+            conn.on('open', () => {
+                console.log('Host\'a bağlandı!');
+            });
+            
+            conn.on('error', (err) => {
+                console.log('Bağlantı hatası, host olunuyor...', err);
+                clearTimeout(hostCheckTimeout);
+            });
+            
+            conn.on('data', (data) => {
+                if (data.type === 'password-required') {
+                    clearTimeout(hostCheckTimeout);
+                    this.showToast('Yanlış şifre!');
+                    conn.close();
+                    if (this.peer) {
+                        this.peer.destroy();
+                        this.peer = null;
+                    }
+                    return;
+                }
+                
+                if (data.type === 'join-accepted') {
+                    clearTimeout(hostCheckTimeout);
+                    this.pendingConnection = null;
+                    this.isHost = false;
+                    console.log('Katılım onaylandı!');
+                    this.completeJoin(conn, hostId);
+                    this.updatePredefinedRoomUrl();
+                    return;
+                }
+                
+                this.handleData(conn, data);
+            });
+            
+            conn.on('close', () => {
+                if (this.pendingConnection) {
+                    // Connection closed before joining, will become host via timeout
+                }
+            });
+            
+        } catch (err) {
+            console.error('Özel odaya katılma hatası:', err);
+        }
+    }
+    
+    updatePredefinedRoomUrl() {
+        // Use query parameter format for predefined rooms
+        if (this.predefinedRoomName) {
+            const baseUrl = window.location.origin + window.location.pathname;
+            const newUrl = baseUrl + '?room=' + this.predefinedRoomName;
+            window.history.replaceState({ roomCode: this.roomCode }, '', newUrl);
+        } else {
+            this.updateRoomUrl();
         }
     }
 
@@ -350,8 +591,15 @@ class VoiceHub {
         this.saveUsername();
         this.roomCodeInput.value = this.pendingJoinCode;
         this.hideUsernameModal();
-        this.showToast('Odaya katılınıyor...');
-        setTimeout(() => this.joinRoom(), 300);
+        
+        // Check if it's a predefined room
+        if (this.predefinedRoomName) {
+            this.showToast('Özel odaya katılınıyor...');
+            setTimeout(() => this.joinPredefinedRoom(), 300);
+        } else {
+            this.showToast('Odaya katılınıyor...');
+            setTimeout(() => this.joinRoom(), 300);
+        }
     }
 
     generateRoomCode() {
@@ -445,9 +693,9 @@ class VoiceHub {
         try {
             this.localStream = await navigator.mediaDevices.getUserMedia({
                 audio: {
-                    echoCancellation: true,
-                    noiseSuppression: true,
-                    autoGainControl: true,
+                    echoCancellation: this.audioSettings.echoCancellation,
+                    noiseSuppression: this.audioSettings.noiseSuppression,
+                    autoGainControl: this.audioSettings.autoGainControl,
                     latency: 0,
                     channelCount: 1,
                     sampleRate: 48000,
@@ -455,6 +703,12 @@ class VoiceHub {
                 },
                 video: false
             });
+
+            // Setup audio processing for noise gate
+            if (this.audioSettings.noiseGate) {
+                this.setupNoiseGate();
+            }
+
             return this.localStream;
         } catch (err) {
             console.error('Mikrofon erişim hatası:', err);
@@ -487,10 +741,24 @@ class VoiceHub {
 
             this.showRoomScreen();
             this.renderParticipants();
+            this.updateRoomUrl();
             this.showToast('Oda oluşturuldu!');
         } catch (err) {
             console.error('Oda oluşturma hatası:', err);
         }
+    }
+
+    updateRoomUrl() {
+        // Update URL to include room code as query parameter
+        const baseUrl = window.location.origin + window.location.pathname;
+        const newUrl = baseUrl + '?room=' + this.roomCode;
+        window.history.replaceState({ roomCode: this.roomCode }, '', newUrl);
+    }
+
+    clearRoomUrl() {
+        // Clear room code from URL when leaving
+        const baseUrl = window.location.origin + window.location.pathname;
+        window.history.replaceState({}, '', baseUrl);
     }
 
     async joinRoom() {
@@ -599,6 +867,9 @@ class VoiceHub {
             isMuted: false
         });
 
+        // Update URL with room code
+        this.updateRoomUrl();
+
         this.showRoomScreen();
         this.renderParticipants();
         this.showToast('Odaya katıldın!');
@@ -672,10 +943,28 @@ class VoiceHub {
 
         // Regular audio call
         console.log('Normal ses çağrısı, yanıtlanıyor');
-        call.answer(this.localStream);
+        
+        // Stream'in hazır olduğundan emin ol
+        if (!this.localStream || this.localStream.getAudioTracks().length === 0) {
+            console.warn('Local stream hazır değil, yeniden oluşturuluyor...');
+            this.getMediaStream().then(() => {
+                call.answer(this.localStream);
+            }).catch(err => {
+                console.error('Stream oluşturulamadı:', err);
+                call.answer(null);
+            });
+        } else {
+            call.answer(this.localStream);
+        }
 
         call.on('stream', (remoteStream) => {
-            console.log('Stream alındı, video tracks:', remoteStream.getVideoTracks().length);
+            console.log('Stream alındı, audio tracks:', remoteStream.getAudioTracks().length, 'video tracks:', remoteStream.getVideoTracks().length);
+
+            // Stream geçerliliğini kontrol et
+            if (!remoteStream || remoteStream.getAudioTracks().length === 0) {
+                console.warn('Geçersiz stream alındı, audio track yok');
+                return;
+            }
 
             // Double check: if this stream has video tracks, it might be screen share
             if (remoteStream.getVideoTracks().length > 0) {
@@ -693,6 +982,19 @@ class VoiceHub {
 
         call.on('error', (err) => {
             console.error('Çağrı hatası:', err);
+            // Hata durumunda yeniden bağlanmayı dene
+            setTimeout(() => {
+                if (this.connections.has(call.peer)) {
+                    console.log('Çağrı yeniden deneniyor:', call.peer);
+                    const newCall = this.peer.call(call.peer, this.localStream, {
+                        metadata: { username: this.username }
+                    });
+                    if (newCall) {
+                        const existing = this.connections.get(call.peer) || {};
+                        this.connections.set(call.peer, { ...existing, call: newCall });
+                    }
+                }
+            }, 2000);
         });
 
         const existing = this.connections.get(call.peer) || {};
@@ -866,15 +1168,17 @@ class VoiceHub {
             });
 
             conn.on('open', () => {
-                const call = this.peer.call(peerId, this.localStream, {
-                    metadata: { username: this.username }
-                });
-
-                call.on('stream', (remoteStream) => {
-                    this.playStream(peerId, remoteStream);
-                });
-
-                this.connections.set(peerId, { conn, call, stream: null });
+                // Stream'in hazır olduğundan emin ol
+                if (!this.localStream || this.localStream.getAudioTracks().length === 0) {
+                    console.warn('Local stream hazır değil, connectToPeer için yeniden oluşturuluyor');
+                    this.getMediaStream().then(() => {
+                        this.makeCallToPeer(peerId, conn);
+                    }).catch(err => {
+                        console.error('Stream oluşturulamadı:', err);
+                    });
+                } else {
+                    this.makeCallToPeer(peerId, conn);
+                }
             });
 
             conn.on('data', (data) => this.handleData(conn, data));
@@ -882,6 +1186,27 @@ class VoiceHub {
         } catch (err) {
             console.error('Peer bağlantı hatası:', err);
         }
+    }
+
+    makeCallToPeer(peerId, conn) {
+        const call = this.peer.call(peerId, this.localStream, {
+            metadata: { username: this.username }
+        });
+
+        call.on('stream', (remoteStream) => {
+            console.log('connectToPeer stream alındı:', peerId);
+            if (remoteStream && remoteStream.getAudioTracks().length > 0) {
+                this.playStream(peerId, remoteStream);
+            } else {
+                console.warn('Geçersiz stream:', peerId);
+            }
+        });
+
+        call.on('error', (err) => {
+            console.error('Call hatası:', err);
+        });
+
+        this.connections.set(peerId, { conn, call, stream: null });
     }
 
     handleDisconnect(peerId) {
@@ -913,24 +1238,64 @@ class VoiceHub {
     playStream(peerId, stream) {
         console.log('Stream oynatılıyor:', peerId);
 
+        // Eski audio element'i temizle
         let audio = this.audioElements.get(peerId);
-        if (!audio) {
-            audio = document.createElement('audio');
-            audio.autoplay = true;
-            audio.playsInline = true;
-            document.body.appendChild(audio);
-            this.audioElements.set(peerId, audio);
+        if (audio) {
+            audio.pause();
+            audio.srcObject = null;
+            audio.remove();
+            this.audioElements.delete(peerId);
         }
 
+        // Yeni audio element oluştur
+        audio = document.createElement('audio');
+        audio.id = 'audio-' + peerId;
+        audio.autoplay = true;
+        audio.playsInline = true;
+        audio.setAttribute('playsinline', '');
+        audio.setAttribute('webkit-playsinline', '');
+        document.body.appendChild(audio);
+        this.audioElements.set(peerId, audio);
+
+        // Stream'i bağla
         audio.srcObject = stream;
 
-        // iOS için gerekli
-        audio.play().catch(err => {
-            console.log('Otomatik oynatma engellendi:', err);
-        });
-
+        // Ses seviyesini ayarla
         const volume = this.volumeSettings.get(peerId) ?? 100;
         audio.volume = volume / 100;
+
+        // Oynatmayı dene - retry mekanizması ile
+        const playWithRetry = (retryCount = 0) => {
+            const playPromise = audio.play();
+            if (playPromise !== undefined) {
+                playPromise.then(() => {
+                    console.log('Stream başarıyla oynatılıyor:', peerId);
+                }).catch(err => {
+                    console.log('Oynatma hatası (deneme ' + (retryCount + 1) + '):', err);
+                    if (retryCount < 3) {
+                        setTimeout(() => playWithRetry(retryCount + 1), 500);
+                    } else {
+                        // Kullanıcı etkileşimi gerekebilir
+                        console.log('Otomatik oynatma engellenmiş olabilir');
+                    }
+                });
+            }
+        };
+
+        playWithRetry();
+
+        // Stream track durumunu izle
+        stream.getAudioTracks().forEach(track => {
+            track.onended = () => {
+                console.log('Audio track ended:', peerId);
+            };
+            track.onmute = () => {
+                console.log('Audio track muted:', peerId);
+            };
+            track.onunmute = () => {
+                console.log('Audio track unmuted:', peerId);
+            };
+        });
     }
 
     broadcastParticipants() {
@@ -1210,8 +1575,60 @@ class VoiceHub {
     }
 
     hideScreenShare() {
+        // Exit fullscreen if active
+        if (document.fullscreenElement || document.webkitFullscreenElement) {
+            this.exitFullscreen();
+        }
         this.screenShareContainer.classList.add('hidden');
         this.screenShareVideo.srcObject = null;
+    }
+
+    toggleFullscreen() {
+        const container = this.screenShareContainer;
+        
+        if (document.fullscreenElement || document.webkitFullscreenElement) {
+            this.exitFullscreen();
+        } else {
+            this.enterFullscreen(container);
+        }
+    }
+
+    enterFullscreen(element) {
+        if (element.requestFullscreen) {
+            element.requestFullscreen();
+        } else if (element.webkitRequestFullscreen) {
+            element.webkitRequestFullscreen();
+        } else if (element.mozRequestFullScreen) {
+            element.mozRequestFullScreen();
+        } else if (element.msRequestFullscreen) {
+            element.msRequestFullscreen();
+        }
+    }
+
+    exitFullscreen() {
+        if (document.exitFullscreen) {
+            document.exitFullscreen();
+        } else if (document.webkitExitFullscreen) {
+            document.webkitExitFullscreen();
+        } else if (document.mozCancelFullScreen) {
+            document.mozCancelFullScreen();
+        } else if (document.msExitFullscreen) {
+            document.msExitFullscreen();
+        }
+    }
+
+    handleFullscreenChange() {
+        const isFullscreen = document.fullscreenElement || document.webkitFullscreenElement;
+        
+        if (isFullscreen) {
+            this.fullscreenEnterIcon.classList.add('hidden');
+            this.fullscreenExitIcon.classList.remove('hidden');
+            this.screenShareContainer.classList.add('fullscreen-mode');
+        } else {
+            this.fullscreenEnterIcon.classList.remove('hidden');
+            this.fullscreenExitIcon.classList.add('hidden');
+            this.screenShareContainer.classList.remove('fullscreen-mode');
+        }
     }
 
     handleScreenShareCall(call) {
@@ -1393,6 +1810,15 @@ class VoiceHub {
         this.myPeerId = null;
         this.reconnectAttempts = 0;
 
+        // Stop mic level monitoring
+        this.stopMicLevelMonitor();
+
+        // Clean up audio context
+        if (this.audioContext) {
+            this.audioContext.close();
+            this.audioContext = null;
+        }
+
         // Reset UI
         this.muteBtn.classList.remove('muted');
         this.micOnIcon.classList.remove('hidden');
@@ -1400,11 +1826,15 @@ class VoiceHub {
         this.roomCodeInput.value = '';
         this.joinRoomSection.classList.add('hidden');
 
+        // Clear room code from URL
+        this.clearRoomUrl();
+
         this.showLobbyScreen();
     }
 
     // ==================== PASSWORD & LINK SHARE ====================
     shareRoomLink() {
+        // Use query parameter format: ?room=ROOMCODE
         const baseUrl = window.location.origin + window.location.pathname;
         let shareUrl = baseUrl + '?room=' + this.roomCode;
 
@@ -1707,6 +2137,209 @@ class VoiceHub {
         this.toastTimeout = setTimeout(() => {
             this.toast.classList.add('hidden');
         }, 3500);
+    }
+
+    // ==================== SETTINGS ====================
+    loadAudioSettings() {
+        const saved = localStorage.getItem('voicehub_audio_settings');
+        if (saved) {
+            try {
+                const settings = JSON.parse(saved);
+                this.audioSettings = { ...this.audioSettings, ...settings };
+                this.noiseThreshold = this.audioSettings.noiseThreshold;
+                this.noiseGateEnabled = this.audioSettings.noiseGate;
+            } catch (e) {
+                console.error('Ayarlar yüklenemedi:', e);
+            }
+        }
+    }
+
+    saveAudioSettings() {
+        localStorage.setItem('voicehub_audio_settings', JSON.stringify(this.audioSettings));
+    }
+
+    showSettingsModal() {
+        // Sync UI with current settings
+        this.noiseSuppressionToggle.checked = this.audioSettings.noiseSuppression;
+        this.echoCancellationToggle.checked = this.audioSettings.echoCancellation;
+        this.autoGainToggle.checked = this.audioSettings.autoGainControl;
+        this.noiseGateToggle.checked = this.audioSettings.noiseGate;
+        this.noiseThresholdSlider.value = this.audioSettings.noiseThreshold;
+        this.noiseThresholdValue.textContent = this.audioSettings.noiseThreshold;
+        this.noiseThresholdLine.style.left = this.audioSettings.noiseThreshold + '%';
+        this.noiseGateSettings.classList.toggle('hidden', !this.audioSettings.noiseGate);
+
+        this.settingsModal.classList.remove('hidden');
+
+        // Start mic level monitor if noise gate is enabled
+        if (this.audioSettings.noiseGate && this.localStream) {
+            this.startMicLevelMonitor();
+        }
+    }
+
+    hideSettingsModal() {
+        this.settingsModal.classList.add('hidden');
+        this.stopMicLevelMonitor();
+    }
+
+    async applyAudioSettings() {
+        if (!this.localStream) return;
+
+        // Get the audio track
+        const audioTrack = this.localStream.getAudioTracks()[0];
+        if (!audioTrack) return;
+
+        try {
+            // Apply new constraints
+            await audioTrack.applyConstraints({
+                echoCancellation: this.audioSettings.echoCancellation,
+                noiseSuppression: this.audioSettings.noiseSuppression,
+                autoGainControl: this.audioSettings.autoGainControl
+            });
+        } catch (err) {
+            console.error('Ses ayarları uygulanamadı:', err);
+            // Some browsers don't support changing constraints on the fly
+            // In that case, we'd need to restart the stream
+            this.showToast('Ayarlar uygulandı (yeniden bağlantı gerekebilir)');
+        }
+    }
+
+    setupNoiseGate() {
+        if (!this.localStream) return;
+
+        try {
+            // Create audio context
+            this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const source = this.audioContext.createMediaStreamSource(this.localStream);
+            
+            // Create analyser for measuring levels
+            this.analyser = this.audioContext.createAnalyser();
+            this.analyser.fftSize = 256;
+            this.analyser.smoothingTimeConstant = 0.8;
+            
+            // Create gain node for volume control
+            this.gainNode = this.audioContext.createGain();
+            this.gainNode.gain.value = 1;
+            
+            // Connect nodes
+            source.connect(this.analyser);
+            this.analyser.connect(this.gainNode);
+            
+            // Start noise gate processing
+            this.processNoiseGate();
+        } catch (err) {
+            console.error('Noise gate kurulumu başarısız:', err);
+        }
+    }
+
+    processNoiseGate() {
+        if (!this.analyser || !this.noiseGateEnabled) return;
+
+        const dataArray = new Uint8Array(this.analyser.frequencyBinCount);
+        
+        const checkLevel = () => {
+            if (!this.analyser || !this.noiseGateEnabled) return;
+            
+            this.analyser.getByteFrequencyData(dataArray);
+            
+            // Calculate average level
+            let sum = 0;
+            for (let i = 0; i < dataArray.length; i++) {
+                sum += dataArray[i];
+            }
+            const average = sum / dataArray.length;
+            const normalizedLevel = (average / 255) * 100;
+            
+            // Apply noise gate
+            if (this.localStream) {
+                const audioTrack = this.localStream.getAudioTracks()[0];
+                if (audioTrack) {
+                    if (normalizedLevel < this.noiseThreshold) {
+                        audioTrack.enabled = this.isMuted ? false : false; // Below threshold, mute
+                    } else {
+                        audioTrack.enabled = this.isMuted ? false : true; // Above threshold, unmute (unless manually muted)
+                    }
+                }
+            }
+            
+            requestAnimationFrame(checkLevel);
+        };
+        
+        checkLevel();
+    }
+
+    startMicLevelMonitor() {
+        if (!this.localStream) return;
+        
+        // Clear existing interval
+        if (this.micLevelInterval) {
+            clearInterval(this.micLevelInterval);
+            this.micLevelInterval = null;
+        }
+
+        try {
+            // Create new audio context for monitoring
+            if (this.monitorAudioContext) {
+                this.monitorAudioContext.close();
+            }
+            this.monitorAudioContext = new (window.AudioContext || window.webkitAudioContext)();
+            
+            // Resume context if suspended (required for Chrome)
+            if (this.monitorAudioContext.state === 'suspended') {
+                this.monitorAudioContext.resume();
+            }
+
+            const source = this.monitorAudioContext.createMediaStreamSource(this.localStream);
+            const analyser = this.monitorAudioContext.createAnalyser();
+            analyser.fftSize = 256;
+            analyser.smoothingTimeConstant = 0.3;
+            
+            source.connect(analyser);
+            
+            const dataArray = new Uint8Array(analyser.frequencyBinCount);
+            
+            const updateLevel = () => {
+                if (!analyser || !this.monitorAudioContext) return;
+                
+                analyser.getByteFrequencyData(dataArray);
+                
+                // Calculate average level (better for voice)
+                let sum = 0;
+                let count = 0;
+                // Focus on voice frequency range (roughly 85-255 Hz mapped to bins)
+                for (let i = 1; i < dataArray.length / 2; i++) {
+                    sum += dataArray[i];
+                    count++;
+                }
+                const average = count > 0 ? sum / count : 0;
+                const normalizedLevel = Math.min(100, (average / 128) * 100);
+                
+                // Update UI
+                if (this.micLevelIndicator) {
+                    this.micLevelIndicator.style.width = normalizedLevel + '%';
+                }
+            };
+            
+            this.micLevelInterval = setInterval(updateLevel, 50);
+        } catch (err) {
+            console.error('Mikrofon seviyesi izlenemedi:', err);
+        }
+    }
+
+    stopMicLevelMonitor() {
+        if (this.micLevelInterval) {
+            clearInterval(this.micLevelInterval);
+            this.micLevelInterval = null;
+        }
+        
+        if (this.monitorAudioContext) {
+            this.monitorAudioContext.close();
+            this.monitorAudioContext = null;
+        }
+        
+        if (this.micLevelIndicator) {
+            this.micLevelIndicator.style.width = '0%';
+        }
     }
 }
 

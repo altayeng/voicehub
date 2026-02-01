@@ -122,6 +122,12 @@
                             <path d="M7 11V7a5 5 0 0 1 10 0v4" />
                         </svg>
                     </button>
+                    <button id="settings-btn" class="icon-btn-action" data-i18n-title="room.settings" title="Ayarlar">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="3" />
+                            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                        </svg>
+                    </button>
                     <button id="leave-room-btn" class="icon-btn-danger" title="Odadan Ayrıl">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
@@ -154,12 +160,22 @@
                                 </svg>
                                 <span id="screen-share-user">Ekran Paylaşımı</span>
                             </div>
-                            <button id="close-screen-share" class="icon-btn-sm" title="Kapat">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <line x1="18" y1="6" x2="6" y2="18" />
-                                    <line x1="6" y1="6" x2="18" y2="18" />
-                                </svg>
-                            </button>
+                            <div class="screen-share-actions">
+                                <button id="fullscreen-btn" class="icon-btn-sm" title="Tam Ekran">
+                                    <svg id="fullscreen-enter-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3" />
+                                    </svg>
+                                    <svg id="fullscreen-exit-icon" class="hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3" />
+                                    </svg>
+                                </button>
+                                <button id="close-screen-share" class="icon-btn-sm" title="Kapat">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <line x1="18" y1="6" x2="6" y2="18" />
+                                        <line x1="6" y1="6" x2="18" y2="18" />
+                                    </svg>
+                                </button>
+                            </div>
                         </div>
                         <video id="screen-share-video" autoplay playsinline></video>
                     </div>
@@ -315,6 +331,105 @@
                             autocomplete="name">
                     </div>
                     <button id="prompt-username-btn" class="btn btn-primary">Katıl</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Settings Modal -->
+        <div id="settings-modal" class="modal hidden">
+            <div class="modal-content modal-content-lg">
+                <div class="modal-header">
+                    <h3 data-i18n="settings.title">Ses Ayarları</h3>
+                    <button id="close-settings-modal" class="icon-btn">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="18" y1="6" x2="6" y2="18" />
+                            <line x1="6" y1="6" x2="18" y2="18" />
+                        </svg>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <!-- Noise Suppression Section -->
+                    <div class="settings-section">
+                        <h4 data-i18n="settings.noiseSuppression">Gürültü Engelleme</h4>
+                        
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <label for="noise-suppression-toggle" data-i18n="settings.autoNoiseSuppression">Otomatik Gürültü Engelleme</label>
+                                <span class="setting-desc" data-i18n="settings.autoNoiseSuppressionDesc">Tarayıcının yerleşik gürültü engelleme özelliğini kullanır</span>
+                            </div>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="noise-suppression-toggle" checked>
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <label for="noise-gate-toggle" data-i18n="settings.noiseGate">Ses Kapısı (Noise Gate)</label>
+                                <span class="setting-desc" data-i18n="settings.noiseGateDesc">Belirli seviyenin altındaki sesleri engeller</span>
+                            </div>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="noise-gate-toggle">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+
+                        <div id="noise-gate-settings" class="sub-settings hidden">
+                            <div class="setting-item">
+                                <div class="setting-info">
+                                    <label for="noise-threshold" data-i18n="settings.noiseThreshold">Eşik Seviyesi</label>
+                                    <span class="setting-desc" data-i18n="settings.noiseThresholdDesc">Bu seviyenin altındaki sesler engellenecek</span>
+                                </div>
+                                <div class="range-control">
+                                    <input type="range" id="noise-threshold" min="0" max="100" value="15">
+                                    <span id="noise-threshold-value">15</span>
+                                </div>
+                            </div>
+                            
+                            <div class="mic-level-container">
+                                <label data-i18n="settings.micLevel">Mikrofon Seviyesi</label>
+                                <div class="mic-level-bar">
+                                    <div id="mic-level-indicator" class="mic-level-indicator"></div>
+                                    <div id="noise-threshold-line" class="noise-threshold-line" style="left: 15%"></div>
+                                </div>
+                                <div class="mic-level-labels">
+                                    <span>0</span>
+                                    <span>50</span>
+                                    <span>100</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Echo Cancellation Section -->
+                    <div class="settings-section">
+                        <h4 data-i18n="settings.echoCancellation">Eko Engelleme</h4>
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <label for="echo-cancellation-toggle" data-i18n="settings.autoEchoCancellation">Otomatik Eko Engelleme</label>
+                                <span class="setting-desc" data-i18n="settings.autoEchoCancellationDesc">Hoparlörden gelen sesin mikrofona geri dönmesini engeller</span>
+                            </div>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="echo-cancellation-toggle" checked>
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Auto Gain Control Section -->
+                    <div class="settings-section">
+                        <h4 data-i18n="settings.autoGain">Otomatik Ses Ayarı</h4>
+                        <div class="setting-item">
+                            <div class="setting-info">
+                                <label for="auto-gain-toggle" data-i18n="settings.autoGainControl">Otomatik Ses Seviyesi</label>
+                                <span class="setting-desc" data-i18n="settings.autoGainControlDesc">Mikrofon ses seviyesini otomatik olarak ayarlar</span>
+                            </div>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="auto-gain-toggle" checked>
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

@@ -28,7 +28,25 @@
         "unmute": "Unmute",
         "sendFile": "Send File",
         "send": "Send",
-        "dropFileHere": "📎 Drop file here"
+        "dropFileHere": "📎 Drop file here",
+        "settings": "Settings"
+    },
+    "settings": {
+        "title": "Audio Settings",
+        "noiseSuppression": "Noise Suppression",
+        "autoNoiseSuppression": "Auto Noise Suppression",
+        "autoNoiseSuppressionDesc": "Uses browser's built-in noise suppression feature",
+        "noiseGate": "Noise Gate",
+        "noiseGateDesc": "Blocks sounds below a certain level",
+        "noiseThreshold": "Threshold Level",
+        "noiseThresholdDesc": "Sounds below this level will be blocked",
+        "micLevel": "Microphone Level",
+        "echoCancellation": "Echo Cancellation",
+        "autoEchoCancellation": "Auto Echo Cancellation",
+        "autoEchoCancellationDesc": "Prevents speaker sound from feeding back to microphone",
+        "autoGain": "Auto Gain",
+        "autoGainControl": "Auto Gain Control",
+        "autoGainControlDesc": "Automatically adjusts microphone volume level"
     },
     "status": {
         "connecting": "Connecting...",

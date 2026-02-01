@@ -28,7 +28,25 @@
         "unmute": "Mikrofonu Aç",
         "sendFile": "Dosya Gönder",
         "send": "Gönder",
-        "dropFileHere": "📎 Dosyayı buraya bırak"
+        "dropFileHere": "📎 Dosyayı buraya bırak",
+        "settings": "Ayarlar"
+    },
+    "settings": {
+        "title": "Ses Ayarları",
+        "noiseSuppression": "Gürültü Engelleme",
+        "autoNoiseSuppression": "Otomatik Gürültü Engelleme",
+        "autoNoiseSuppressionDesc": "Tarayıcının yerleşik gürültü engelleme özelliğini kullanır",
+        "noiseGate": "Ses Kapısı (Noise Gate)",
+        "noiseGateDesc": "Belirli seviyenin altındaki sesleri engeller",
+        "noiseThreshold": "Eşik Seviyesi",
+        "noiseThresholdDesc": "Bu seviyenin altındaki sesler engellenecek",
+        "micLevel": "Mikrofon Seviyesi",
+        "echoCancellation": "Eko Engelleme",
+        "autoEchoCancellation": "Otomatik Eko Engelleme",
+        "autoEchoCancellationDesc": "Hoparlörden gelen sesin mikrofona geri dönmesini engeller",
+        "autoGain": "Otomatik Ses Ayarı",
+        "autoGainControl": "Otomatik Ses Seviyesi",
+        "autoGainControlDesc": "Mikrofon ses seviyesini otomatik olarak ayarlar"
     },
     "status": {
         "connecting": "Bağlanıyor...",
