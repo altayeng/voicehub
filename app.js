@@ -20,6 +20,7 @@ class VoiceHub {
         this.pendingJoinCode = null;
         this.reconnectAttempts = 0;
         this.maxReconnectAttempts = 3;
+        this.isBecomingHost = false; // Host değiştirme sırasında reconnect'i engelle
 
         // Audio processing for noise gate
         this.audioContext = null;
@@ -388,9 +389,9 @@ class VoiceHub {
     // Predefined special rooms
     getPredefinedRooms() {
         return {
-            'cs2': { code: 'CS2ODA', password: '4848' },
-            'valorant': { code: 'VALODA', password: '4848' },
-            'lol': { code: 'LOLODA', password: '4848' }
+            'cs2': { code: 'CS2ODA', password: null },
+            'valorant': { code: 'VALODA', password: null },
+            'lol': { code: 'LOLODA', password: null }
         };
     }
 
@@ -398,23 +399,23 @@ class VoiceHub {
         const urlParams = new URLSearchParams(window.location.search);
         let roomCode = urlParams.get('room');
         const urlPassword = urlParams.get('pwd');
-        
+
         if (!roomCode) return;
-        
+
         // Check for predefined room names (e.g., ?room=cs2)
         const predefinedRooms = this.getPredefinedRooms();
         const roomLower = roomCode.toLowerCase();
-        
+
         if (predefinedRooms[roomLower]) {
             const roomConfig = predefinedRooms[roomLower];
             this.pendingJoinCode = roomConfig.code;
             this.predefinedRoomName = roomLower;
             this.predefinedRoomConfig = roomConfig;
-            
+
             if (roomConfig.password) {
                 this.enteredPassword = roomConfig.password;
             }
-            
+
             // Check if username already exists
             const savedUsername = localStorage.getItem('voicehub_username');
             if (savedUsername && savedUsername.trim()) {
@@ -427,7 +428,7 @@ class VoiceHub {
             }
             return;
         }
-        
+
         // Regular 6-character room code
 
         if (roomCode.length === 6) {
@@ -458,50 +459,61 @@ class VoiceHub {
         // Try to join the predefined room, if host not available, become host
         this.username = this.usernameInput.value.trim() || 'Anonim';
         this.roomCode = this.pendingJoinCode;
-        
+
         try {
             await this.getMediaStream();
             await this.initPeer(this.roomCode, false);
-            
+
             const hostId = `voicehub-${this.roomCode}-host`;
-            
+
             // Try to connect to existing host
             this.showToast('Odaya bağlanılıyor...');
-            
+
             // Set a timeout to become host if no response
             const hostCheckTimeout = setTimeout(async () => {
                 if (this.pendingConnection) {
                     console.log('Host bulunamadı, host olunuyor...');
                     this.pendingConnection = null;
-                    
+
+                    // Host değiştirme işlemi başlıyor - reconnect'i engelle
+                    this.isBecomingHost = true;
+
                     // Destroy current peer and recreate as host
                     if (this.peer) {
                         this.peer.destroy();
+                        this.peer = null;
                     }
-                    
+
+                    // Mikrofon stream'ini yeniden al (peer destroy edildiğinde stream bozulmuş olabilir)
+                    try {
+                        await this.getMediaStream();
+                    } catch (err) {
+                        console.error('Mikrofon yeniden alınamadı:', err);
+                    }
+
                     this.isHost = true;
                     await this.initPeer(this.roomCode, true);
-                    
-                    // Set the predefined password if exists
-                    if (this.predefinedRoomConfig?.password) {
-                        this.roomPassword = this.predefinedRoomConfig.password;
-                        this.updatePasswordUI();
-                    }
-                    
+
+                    // Host değiştirme tamamlandı
+                    this.isBecomingHost = false;
+
+                    // Predefined odalarda otomatik şifre KOYMA - kullanıcı isterse manuel koyar
+                    // Eski kod kaldırıldı: this.roomPassword = this.predefinedRoomConfig.password
+
                     this.participants.set(this.myPeerId, {
                         id: this.myPeerId,
                         name: this.username,
                         isHost: true,
                         isMuted: false
                     });
-                    
+
                     this.showRoomScreen();
                     this.renderParticipants();
                     this.updatePredefinedRoomUrl();
                     this.showToast('Oda oluşturuldu - Host sizsiniz!');
                 }
             }, 3000);
-            
+
             const conn = this.peer.connect(hostId, {
                 metadata: {
                     username: this.username,
@@ -510,18 +522,18 @@ class VoiceHub {
                 },
                 reliable: true
             });
-            
+
             this.pendingConnection = { conn, hostId, timeout: hostCheckTimeout };
-            
+
             conn.on('open', () => {
                 console.log('Host\'a bağlandı!');
             });
-            
+
             conn.on('error', (err) => {
                 console.log('Bağlantı hatası, host olunuyor...', err);
                 clearTimeout(hostCheckTimeout);
             });
-            
+
             conn.on('data', (data) => {
                 if (data.type === 'password-required') {
                     clearTimeout(hostCheckTimeout);
@@ -533,7 +545,7 @@ class VoiceHub {
                     }
                     return;
                 }
-                
+
                 if (data.type === 'join-accepted') {
                     clearTimeout(hostCheckTimeout);
                     this.pendingConnection = null;
@@ -543,21 +555,21 @@ class VoiceHub {
                     this.updatePredefinedRoomUrl();
                     return;
                 }
-                
+
                 this.handleData(conn, data);
             });
-            
+
             conn.on('close', () => {
                 if (this.pendingConnection) {
                     // Connection closed before joining, will become host via timeout
                 }
             });
-            
+
         } catch (err) {
             console.error('Özel odaya katılma hatası:', err);
         }
     }
-    
+
     updatePredefinedRoomUrl() {
         // Use query parameter format for predefined rooms
         if (this.predefinedRoomName) {
@@ -591,7 +603,7 @@ class VoiceHub {
         this.saveUsername();
         this.roomCodeInput.value = this.pendingJoinCode;
         this.hideUsernameModal();
-        
+
         // Check if it's a predefined room
         if (this.predefinedRoomName) {
             this.showToast('Özel odaya katılınıyor...');
@@ -668,6 +680,12 @@ class VoiceHub {
             });
 
             this.peer.on('disconnected', () => {
+                // Host değiştirme sırasında reconnect yapma
+                if (this.isBecomingHost) {
+                    console.log('Host değiştirme sırasında - reconnect atlandı');
+                    return;
+                }
+
                 console.log('Peer bağlantısı koptu, yeniden bağlanılıyor...');
                 this.updateConnectionStatus('connecting');
 
@@ -690,36 +708,98 @@ class VoiceHub {
     }
 
     async getMediaStream() {
-        try {
-            this.localStream = await navigator.mediaDevices.getUserMedia({
-                audio: {
-                    echoCancellation: this.audioSettings.echoCancellation,
-                    noiseSuppression: this.audioSettings.noiseSuppression,
-                    autoGainControl: this.audioSettings.autoGainControl,
-                    latency: 0,
-                    channelCount: 1,
-                    sampleRate: 48000,
-                    sampleSize: 16
-                },
-                video: false
-            });
+        // Detaylı audio constraint'ler - Chrome için optimize
+        const advancedConstraints = {
+            audio: {
+                echoCancellation: this.audioSettings.echoCancellation,
+                noiseSuppression: this.audioSettings.noiseSuppression,
+                autoGainControl: this.audioSettings.autoGainControl,
+                latency: 0,
+                channelCount: 1,
+                sampleRate: 48000,
+                sampleSize: 16
+            },
+            video: false
+        };
 
+        // Basit audio constraint'ler - Safari/Firefox fallback için
+        const simpleConstraints = {
+            audio: {
+                echoCancellation: this.audioSettings.echoCancellation,
+                noiseSuppression: this.audioSettings.noiseSuppression,
+                autoGainControl: this.audioSettings.autoGainControl
+            },
+            video: false
+        };
+
+        // En basit constraint - son çare
+        const basicConstraints = {
+            audio: true,
+            video: false
+        };
+
+        try {
+            // Önce detaylı constraint'ler ile dene (Chrome)
+            this.localStream = await navigator.mediaDevices.getUserMedia(advancedConstraints);
+        } catch (err) {
+            console.warn('Detaylı audio constraint başarısız, basit denenecek:', err.name);
+
+            // OverconstrainedError veya TypeError ise basit constraint ile dene (Safari/Firefox)
+            if (err.name === 'OverconstrainedError' || err.name === 'TypeError' || err.name === 'NotSupportedError') {
+                try {
+                    this.localStream = await navigator.mediaDevices.getUserMedia(simpleConstraints);
+                    console.log('Basit audio constraint başarılı');
+                } catch (err2) {
+                    console.warn('Basit audio constraint başarısız, temel denenecek:', err2.name);
+
+                    // Hala başarısızsa en temel constraint ile dene
+                    if (err2.name === 'OverconstrainedError' || err2.name === 'TypeError' || err2.name === 'NotSupportedError') {
+                        try {
+                            this.localStream = await navigator.mediaDevices.getUserMedia(basicConstraints);
+                            console.log('Temel audio constraint başarılı');
+                            this.showToast('Bazı ses özellikleri bu tarayıcıda desteklenmiyor');
+                        } catch (err3) {
+                            // Hiçbiri çalışmadı
+                            this.handleMicError(err3);
+                            throw err3;
+                        }
+                    } else {
+                        this.handleMicError(err2);
+                        throw err2;
+                    }
+                }
+            } else {
+                this.handleMicError(err);
+                throw err;
+            }
+        }
+
+        // Stream alındıysa noise gate ayarla
+        if (this.localStream) {
             // Setup audio processing for noise gate
             if (this.audioSettings.noiseGate) {
                 this.setupNoiseGate();
             }
-
             return this.localStream;
-        } catch (err) {
-            console.error('Mikrofon erişim hatası:', err);
-            if (err.name === 'NotAllowedError') {
-                this.showToast('Mikrofon izni reddedildi! Lütfen izin verin.');
-            } else if (err.name === 'NotFoundError') {
-                this.showToast('Mikrofon bulunamadı!');
-            } else {
-                this.showToast('Mikrofon erişimi gerekli!');
-            }
-            throw err;
+        }
+
+        this.showToast('Mikrofon erişimi gerekli!');
+        throw new Error('Mikrofon stream alınamadı');
+    }
+
+    // Mikrofon hata yöneticisi - getMediaStream tarafından kullanılır
+    handleMicError(err) {
+        console.error('Mikrofon erişim hatası:', err);
+        if (err.name === 'NotAllowedError') {
+            this.showToast('Mikrofon izni reddedildi! Lütfen izin verin.');
+        } else if (err.name === 'NotFoundError') {
+            this.showToast('Mikrofon bulunamadı!');
+        } else if (err.name === 'NotReadableError') {
+            this.showToast('Mikrofon başka bir uygulama tarafından kullanılıyor!');
+        } else if (err.name === 'SecurityError') {
+            this.showToast('Güvenli bağlantı (HTTPS) gerekli!');
+        } else {
+            this.showToast('Mikrofon erişimi gerekli!');
         }
     }
 
@@ -941,30 +1021,12 @@ class VoiceHub {
             return;
         }
 
-        // Regular audio call
+        // Regular audio call - eski kodun basit yaklaşımı (çalışan)
         console.log('Normal ses çağrısı, yanıtlanıyor');
-        
-        // Stream'in hazır olduğundan emin ol
-        if (!this.localStream || this.localStream.getAudioTracks().length === 0) {
-            console.warn('Local stream hazır değil, yeniden oluşturuluyor...');
-            this.getMediaStream().then(() => {
-                call.answer(this.localStream);
-            }).catch(err => {
-                console.error('Stream oluşturulamadı:', err);
-                call.answer(null);
-            });
-        } else {
-            call.answer(this.localStream);
-        }
+        call.answer(this.localStream);
 
         call.on('stream', (remoteStream) => {
             console.log('Stream alındı, audio tracks:', remoteStream.getAudioTracks().length, 'video tracks:', remoteStream.getVideoTracks().length);
-
-            // Stream geçerliliğini kontrol et
-            if (!remoteStream || remoteStream.getAudioTracks().length === 0) {
-                console.warn('Geçersiz stream alındı, audio track yok');
-                return;
-            }
 
             // Double check: if this stream has video tracks, it might be screen share
             if (remoteStream.getVideoTracks().length > 0) {
@@ -982,19 +1044,6 @@ class VoiceHub {
 
         call.on('error', (err) => {
             console.error('Çağrı hatası:', err);
-            // Hata durumunda yeniden bağlanmayı dene
-            setTimeout(() => {
-                if (this.connections.has(call.peer)) {
-                    console.log('Çağrı yeniden deneniyor:', call.peer);
-                    const newCall = this.peer.call(call.peer, this.localStream, {
-                        metadata: { username: this.username }
-                    });
-                    if (newCall) {
-                        const existing = this.connections.get(call.peer) || {};
-                        this.connections.set(call.peer, { ...existing, call: newCall });
-                    }
-                }
-            }, 2000);
         });
 
         const existing = this.connections.get(call.peer) || {};
@@ -1585,7 +1634,7 @@ class VoiceHub {
 
     toggleFullscreen() {
         const container = this.screenShareContainer;
-        
+
         if (document.fullscreenElement || document.webkitFullscreenElement) {
             this.exitFullscreen();
         } else {
@@ -1619,7 +1668,7 @@ class VoiceHub {
 
     handleFullscreenChange() {
         const isFullscreen = document.fullscreenElement || document.webkitFullscreenElement;
-        
+
         if (isFullscreen) {
             this.fullscreenEnterIcon.classList.add('hidden');
             this.fullscreenExitIcon.classList.remove('hidden');
@@ -2211,20 +2260,20 @@ class VoiceHub {
             // Create audio context
             this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
             const source = this.audioContext.createMediaStreamSource(this.localStream);
-            
+
             // Create analyser for measuring levels
             this.analyser = this.audioContext.createAnalyser();
             this.analyser.fftSize = 256;
             this.analyser.smoothingTimeConstant = 0.8;
-            
+
             // Create gain node for volume control
             this.gainNode = this.audioContext.createGain();
             this.gainNode.gain.value = 1;
-            
+
             // Connect nodes
             source.connect(this.analyser);
             this.analyser.connect(this.gainNode);
-            
+
             // Start noise gate processing
             this.processNoiseGate();
         } catch (err) {
@@ -2236,12 +2285,12 @@ class VoiceHub {
         if (!this.analyser || !this.noiseGateEnabled) return;
 
         const dataArray = new Uint8Array(this.analyser.frequencyBinCount);
-        
+
         const checkLevel = () => {
             if (!this.analyser || !this.noiseGateEnabled) return;
-            
+
             this.analyser.getByteFrequencyData(dataArray);
-            
+
             // Calculate average level
             let sum = 0;
             for (let i = 0; i < dataArray.length; i++) {
@@ -2249,7 +2298,7 @@ class VoiceHub {
             }
             const average = sum / dataArray.length;
             const normalizedLevel = (average / 255) * 100;
-            
+
             // Apply noise gate
             if (this.localStream) {
                 const audioTrack = this.localStream.getAudioTracks()[0];
@@ -2261,16 +2310,16 @@ class VoiceHub {
                     }
                 }
             }
-            
+
             requestAnimationFrame(checkLevel);
         };
-        
+
         checkLevel();
     }
 
     startMicLevelMonitor() {
         if (!this.localStream) return;
-        
+
         // Clear existing interval
         if (this.micLevelInterval) {
             clearInterval(this.micLevelInterval);
@@ -2283,7 +2332,7 @@ class VoiceHub {
                 this.monitorAudioContext.close();
             }
             this.monitorAudioContext = new (window.AudioContext || window.webkitAudioContext)();
-            
+
             // Resume context if suspended (required for Chrome)
             if (this.monitorAudioContext.state === 'suspended') {
                 this.monitorAudioContext.resume();
@@ -2293,16 +2342,16 @@ class VoiceHub {
             const analyser = this.monitorAudioContext.createAnalyser();
             analyser.fftSize = 256;
             analyser.smoothingTimeConstant = 0.3;
-            
+
             source.connect(analyser);
-            
+
             const dataArray = new Uint8Array(analyser.frequencyBinCount);
-            
+
             const updateLevel = () => {
                 if (!analyser || !this.monitorAudioContext) return;
-                
+
                 analyser.getByteFrequencyData(dataArray);
-                
+
                 // Calculate average level (better for voice)
                 let sum = 0;
                 let count = 0;
@@ -2313,13 +2362,13 @@ class VoiceHub {
                 }
                 const average = count > 0 ? sum / count : 0;
                 const normalizedLevel = Math.min(100, (average / 128) * 100);
-                
+
                 // Update UI
                 if (this.micLevelIndicator) {
                     this.micLevelIndicator.style.width = normalizedLevel + '%';
                 }
             };
-            
+
             this.micLevelInterval = setInterval(updateLevel, 50);
         } catch (err) {
             console.error('Mikrofon seviyesi izlenemedi:', err);
@@ -2331,12 +2380,12 @@ class VoiceHub {
             clearInterval(this.micLevelInterval);
             this.micLevelInterval = null;
         }
-        
+
         if (this.monitorAudioContext) {
             this.monitorAudioContext.close();
             this.monitorAudioContext = null;
         }
-        
+
         if (this.micLevelIndicator) {
             this.micLevelIndicator.style.width = '0%';
         }
