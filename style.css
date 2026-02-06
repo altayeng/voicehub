@@ -1011,7 +1011,7 @@ body {
 }
 
 .chat-panel.drag-over .chat-messages::after {
-    content: '📎 Dosyayı buraya bırak';
+    content: 'ðŸ“Ž DosyayÄ± buraya bÄ±rak';
     position: absolute;
     top: 50%;
     left: 50%;
@@ -1266,7 +1266,7 @@ body {
 
 /* Double-click to fullscreen hint */
 #screen-share-video:hover::after {
-    content: 'Tam ekran için çift tıkla';
+    content: 'Tam ekran iÃ§in Ã§ift tÄ±kla';
 }
 
 /* ==================== MODAL ==================== */
@@ -1513,17 +1513,17 @@ body {
     border-radius: 50%;
 }
 
-.toggle-switch input:checked + .toggle-slider {
+.toggle-switch input:checked+.toggle-slider {
     background-color: var(--accent-primary);
     border-color: var(--accent-primary);
 }
 
-.toggle-switch input:checked + .toggle-slider:before {
+.toggle-switch input:checked+.toggle-slider:before {
     transform: translateX(22px);
     background-color: white;
 }
 
-.toggle-switch input:focus + .toggle-slider {
+.toggle-switch input:focus+.toggle-slider {
     box-shadow: 0 0 0 3px var(--accent-glow);
 }
 
